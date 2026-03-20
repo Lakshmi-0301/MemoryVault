@@ -28,8 +28,11 @@ function Login() {
   const data = await res.json();
 
   if (res.status === 200) {
-    alert(data.message);
-    navigate("/homepage");   
+    // Store user info (name, email, dob) for use across the app (e.g. Timeline)
+    if (data.user) {
+      localStorage.setItem("mv_user", JSON.stringify(data.user));
+    }
+    navigate("/home");
   } else {
     alert(data.message);
   }
