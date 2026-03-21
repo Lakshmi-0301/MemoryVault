@@ -1,58 +1,62 @@
 // timelineService.js
-// LocalStorage adapter for timeline events.
-// Designed for easy migration to MongoDB - just swap the implementation
-// of these functions to API calls, keeping the same interface.
+// Backend API adapter for timeline events (MongoDB via Flask backend).
 
-const EVENTS_KEY_PREFIX = "mv_timeline_";
-
-/**
- * Get the localStorage key for a specific user's events.
- * MongoDB equivalent: collection key / user_id filter.
- */
-const getUserKey = (userEmail) => `${EVENTS_KEY_PREFIX}${userEmail}`;
+const API_URL = "http://127.0.0.1:5000/api/events";
 
 /**
  * Fetch all events for a user, sorted chronologically.
- * MongoDB equivalent: db.events.find({ user_email }).sort({ date: 1 })
  */
-export const getEvents = (userEmail) => {
+export const getEvents = async (userEmail) => {
   if (!userEmail) return [];
-  const raw = localStorage.getItem(getUserKey(userEmail));
-  const events = raw ? JSON.parse(raw) : [];
-  return events.sort((a, b) => new Date(a.date) - new Date(b.date));
+  try {
+    const res = await fetch(`${API_URL}/${userEmail}`);
+    if (!res.ok) throw new Error("Failed to fetch events");
+    const data = await res.json();
+    const events = data.events || [];
+    return events.sort((a, b) => new Date(a.date) - new Date(b.date));
+  } catch (err) {
+    console.error("Error fetching events:", err);
+    return [];
+  }
 };
 
 /**
  * Save a new event for a user.
- * MongoDB equivalent: db.events.insertOne({ ...event, user_email })
  */
-export const addEvent = (userEmail, event) => {
-  const events = getEvents(userEmail);
-
-  // Prevent duplicate IDs
-  const exists = events.find((e) => e.id === event.id);
-  if (exists) return events;
-
-  events.push(event);
-  events.sort((a, b) => new Date(a.date) - new Date(b.date));
-  localStorage.setItem(getUserKey(userEmail), JSON.stringify(events));
-  return events;
+export const addEvent = async (userEmail, event) => {
+  try {
+    const res = await fetch(`${API_URL}/${userEmail}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(event),
+    });
+    if (!res.ok) {
+      console.error("Failed to add event:", await res.text());
+    }
+  } catch (err) {
+    console.error("Error adding event:", err);
+  }
+  return await getEvents(userEmail);
 };
 
 /**
  * Delete an event by ID.
- * MongoDB equivalent: db.events.deleteOne({ id, user_email })
  */
-export const deleteEvent = (userEmail, eventId) => {
-  const events = getEvents(userEmail).filter((e) => e.id !== eventId);
-  localStorage.setItem(getUserKey(userEmail), JSON.stringify(events));
-  return events;
+export const deleteEvent = async (userEmail, eventId) => {
+  try {
+    const res = await fetch(`${API_URL}/${userEmail}/${eventId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) console.error("Failed to delete event");
+  } catch (err) {
+    console.error("Error deleting event:", err);
+  }
+  return await getEvents(userEmail);
 };
 
 /**
- * Clear all events for a user (useful for testing).
- * MongoDB equivalent: db.events.deleteMany({ user_email })
+ * Clear all events for a user.
  */
-export const clearEvents = (userEmail) => {
-  localStorage.removeItem(getUserKey(userEmail));
+export const clearEvents = async (_userEmail) => {
+  console.warn("clearEvents not fully implemented on server yet.");
 };

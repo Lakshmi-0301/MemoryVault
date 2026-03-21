@@ -278,7 +278,8 @@ function AddCapsule() {
     formData.append("open_date", form.open_date);
     formData.append("notes", form.notes);
     formData.append("letter", form.letter);
-    formData.append("email", localStorage.getItem("email"));
+    const user = JSON.parse(localStorage.getItem("mv_user") || "{}");
+    formData.append("email", user.email);
     photos.forEach(f => formData.append("photos", f));
     audios.forEach(f => formData.append("audios", f));
     videos.forEach(f => formData.append("videos", f));
