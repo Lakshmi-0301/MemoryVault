@@ -5,9 +5,7 @@ import uuid
 app = Flask(__name__)
 CORS(app)
 
-# In-memory "database" - replace with MongoDB later
 users = []
-# Stub in-memory events store (keyed by user email) - replace with MongoDB collection
 events_store = {}
 
 from datetime import datetime
@@ -61,9 +59,6 @@ def get_users():
     return jsonify(users), 200
 
 
-# ---------------- EVENTS (Stub for future MongoDB) ----------------
-# These endpoints mirror the LocalStorage structure used on the frontend.
-# Future: replace events_store with MongoDB collection queries.
 
 @app.route("/api/events/<user_email>", methods=["GET"])
 def get_events(user_email):
@@ -146,5 +141,58 @@ def open_capsule():
                 return jsonify({"status": "locked", "message": "Too early!"})
 
     return jsonify({"message": "Capsule not found"}), 404
+
+ 
+@app.route("/profile/<email>", methods=["GET"])
+def get_profile(email):
+    """
+    Returns the profile details for a given user email.
+    Frontend calls: GET /profile/<email>
+    """
+    user = next((u for u in users if u["email"] == email), None)
+ 
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+ 
+    return jsonify({
+        "name":  user["name"],
+        "email": user["email"],
+        "dob":   user["dob"],
+    }), 200
+ 
+ 
+@app.route("/change_password", methods=["POST"])
+def change_password():
+    """
+    Changes the password for a user after verifying the current one.
+    Body (JSON): { "email": "...", "current_password": "...", "new_password": "..." }
+    """
+    data = request.get_json()
+ 
+    email            = data.get("email", "").strip()
+    current_password = data.get("current_password", "")
+    new_password     = data.get("new_password", "")
+ 
+    if not email or not current_password or not new_password:
+        return jsonify({"message": "All fields are required"}), 400
+ 
+    if len(new_password) < 8:
+        return jsonify({"message": "New password must be at least 8 characters"}), 400
+ 
+    user = next((u for u in users if u["email"] == email), None)
+ 
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+ 
+    if user["password"] != current_password:
+        return jsonify({"message": "Current password is incorrect"}), 401
+ 
+    if new_password == current_password:
+        return jsonify({"message": "New password must differ from the current one"}), 400
+ 
+    user["password"] = new_password
+    return jsonify({"message": "Password updated successfully"}), 200
+
+
 if __name__ == "__main__":
     app.run(debug=True)
