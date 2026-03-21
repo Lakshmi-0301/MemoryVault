@@ -1,88 +1,132 @@
+import os
+import uuid
+from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import uuid
+from dotenv import load_dotenv
+from pymongo import MongoClient
+
+# ---------------- INIT ----------------
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-users = []
-events_store = {}
+# ---------------- DB CONNECTION ----------------
+MONGO_URI = os.getenv("MONGO_URI")
+if not MONGO_URI:
+    # Fallback/Debug check
+    raise RuntimeError("MONGO_URI not set in environment variables.")
 
-from datetime import datetime
-capsules = []
+client = MongoClient(MONGO_URI)
+db = client["memoryvault"]
 
-# ---------------- SIGNUP ----------------
+users_col = db["users"]
+events_col = db["events"]
+capsules_col = db["capsules"]
+
+# ---------------- AUTH ----------------
 @app.route("/signup", methods=["POST"])
 def signup():
     data = request.form
+    email = data.get("email")
+
+    if users_col.find_one({"email": email}):
+        return jsonify({"message": "User already exists"}), 400
 
     user = {
         "name": data.get("name"),
-        "email": data.get("email"),
+        "email": email,
         "password": data.get("password"),
         "dob": data.get("dob")
     }
 
-    # check if user exists
-    for u in users:
-        if u["email"] == user["email"]:
-            return jsonify({"message": "User already exists"}), 400
-
-    users.append(user)
+    users_col.insert_one(user)
     return jsonify({"message": "Signup successful"}), 200
 
 
-# ---------------- LOGIN ----------------
 @app.route("/login", methods=["POST"])
 def login():
     data = request.json
-
     email = data.get("email")
     password = data.get("password")
 
-    for user in users:
-        if user["email"] == email and user["password"] == password:
-            return jsonify({
-                "message": "Login successful",
-                "user": {
-                    "name": user["name"],
-                    "email": user["email"],
-                    "dob": user["dob"]
-                }
-            }), 200
+    user = users_col.find_one(
+        {"email": email, "password": password},
+        {"_id": 0}
+    )
+
+    if user:
+        return jsonify({
+            "message": "Login successful",
+            "user": user
+        }), 200
 
     return jsonify({"message": "Invalid credentials"}), 401
 
 
 @app.route("/users", methods=["GET"])
 def get_users():
+    users = list(users_col.find({}, {"_id": 0, "password": 0}))
     return jsonify(users), 200
 
 
+# ---------------- PROFILE ----------------
+@app.route("/profile/<email>", methods=["GET"])
+def get_profile(email):
+    user = users_col.find_one({"email": email}, {"_id": 0, "password": 0})
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+    return jsonify(user), 200
 
+
+@app.route("/change_password", methods=["POST"])
+def change_password():
+    data = request.json
+    email = data.get("email")
+    current_password = data.get("current_password")
+    new_password = data.get("new_password")
+
+    if not email or not current_password or not new_password:
+        return jsonify({"message": "All fields required"}), 400
+
+    if len(new_password) < 8:
+        return jsonify({"message": "Password must be >= 8 chars"}), 400
+
+    user = users_col.find_one({"email": email})
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    if user["password"] != current_password:
+        return jsonify({"message": "Incorrect current password"}), 401
+
+    if current_password == new_password:
+        return jsonify({"message": "New password must differ"}), 400
+
+    users_col.update_one(
+        {"email": email},
+        {"$set": {"password": new_password}}
+    )
+    return jsonify({"message": "Password updated"}), 200
+
+
+# ---------------- EVENTS ----------------
 @app.route("/api/events/<user_email>", methods=["GET"])
 def get_events(user_email):
-    """Fetch all timeline events for a user. Future: Query MongoDB by user_email."""
-    user_events = events_store.get(user_email, [])
-    return jsonify({"events": user_events}), 200
+    events = list(events_col.find({"user_email": user_email}, {"_id": 0}))
+    return jsonify({"events": events}), 200
 
 
 @app.route("/api/events/<user_email>", methods=["POST"])
 def add_event(user_email):
-    """
-    Add a new timeline event for the user.
-    Future: Insert into MongoDB events collection.
-    Body: { id, event_name, date, notes, media: {images, audio, video}, is_dob }
-    """
     data = request.json
-    if not data:
-        return jsonify({"message": "Invalid request body"}), 400
+    if not data or not data.get("event_name") or not data.get("date"):
+        return jsonify({"message": "event_name & date required"}), 400
 
-    if not data.get("event_name") or not data.get("date"):
-        return jsonify({"message": "event_name and date are required"}), 400
+    event_id = data.get("id", str(uuid.uuid4()))
 
     event = {
-        "id": data.get("id", str(uuid.uuid4())),
+        "id": event_id,
         "event_name": data.get("event_name"),
         "date": data.get("date"),
         "notes": data.get("notes", ""),
@@ -95,17 +139,27 @@ def add_event(user_email):
         "user_email": user_email,
     }
 
-    if user_email not in events_store:
-        events_store[user_email] = []
+    # Idempotent insert/update
+    events_col.update_one(
+        {"id": event_id, "user_email": user_email},
+        {"$set": event},
+        upsert=True
+    )
+    return jsonify({"message": "Event saved", "event": event}), 201
 
-    events_store[user_email].append(event)
-    return jsonify({"message": "Event added", "event": event}), 201
+
+@app.route("/api/events/<user_email>/<event_id>", methods=["DELETE"])
+def delete_event(user_email, event_id):
+    result = events_col.delete_one({"id": event_id, "user_email": user_email})
+    if result.deleted_count:
+        return jsonify({"message": "Deleted"}), 200
+    return jsonify({"message": "Not found"}), 404
 
 
+# ---------------- CAPSULES ----------------
 @app.route("/add_capsule", methods=["POST"])
 def add_capsule():
     data = request.form
-
     capsule = {
         "name": data.get("name"),
         "email": data.get("email"),
@@ -114,85 +168,37 @@ def add_capsule():
         "notes": data.get("notes"),
         "letter": data.get("letter")
     }
-
-    capsules.append(capsule)
-
+    capsules_col.insert_one(capsule)
     return jsonify({"message": "Capsule created"}), 200
+
 
 @app.route("/capsules/<email>", methods=["GET"])
 def get_capsules(email):
-    user_capsules = [c for c in capsules if c["email"] == email]
-    return jsonify(user_capsules), 200
+    capsules = list(capsules_col.find({"email": email}, {"_id": 0}))
+    return jsonify(capsules), 200
+
 
 @app.route("/open_capsule", methods=["POST"])
 def open_capsule():
     data = request.json
-
     name = data.get("name")
     email = data.get("email")
 
-    for c in capsules:
-        if c["name"] == name and c["email"] == email:
-            today = datetime.now().strftime("%Y-%m-%d")
+    capsule = capsules_col.find_one(
+        {"name": name, "email": email},
+        {"_id": 0}
+    )
 
-            if today >= c["open_date"]:
-                return jsonify({"status": "open", "capsule": c})
-            else:
-                return jsonify({"status": "locked", "message": "Too early!"})
+    if not capsule:
+        return jsonify({"message": "Not found"}), 404
 
-    return jsonify({"message": "Capsule not found"}), 404
-
- 
-@app.route("/profile/<email>", methods=["GET"])
-def get_profile(email):
-    """
-    Returns the profile details for a given user email.
-    Frontend calls: GET /profile/<email>
-    """
-    user = next((u for u in users if u["email"] == email), None)
- 
-    if not user:
-        return jsonify({"message": "User not found"}), 404
- 
-    return jsonify({
-        "name":  user["name"],
-        "email": user["email"],
-        "dob":   user["dob"],
-    }), 200
- 
- 
-@app.route("/change_password", methods=["POST"])
-def change_password():
-    """
-    Changes the password for a user after verifying the current one.
-    Body (JSON): { "email": "...", "current_password": "...", "new_password": "..." }
-    """
-    data = request.get_json()
- 
-    email            = data.get("email", "").strip()
-    current_password = data.get("current_password", "")
-    new_password     = data.get("new_password", "")
- 
-    if not email or not current_password or not new_password:
-        return jsonify({"message": "All fields are required"}), 400
- 
-    if len(new_password) < 8:
-        return jsonify({"message": "New password must be at least 8 characters"}), 400
- 
-    user = next((u for u in users if u["email"] == email), None)
- 
-    if not user:
-        return jsonify({"message": "User not found"}), 404
- 
-    if user["password"] != current_password:
-        return jsonify({"message": "Current password is incorrect"}), 401
- 
-    if new_password == current_password:
-        return jsonify({"message": "New password must differ from the current one"}), 400
- 
-    user["password"] = new_password
-    return jsonify({"message": "Password updated successfully"}), 200
+    today = datetime.now().strftime("%Y-%m-%d")
+    if today >= capsule["open_date"]:
+        return jsonify({"status": "open", "capsule": capsule})
+    else:
+        return jsonify({"status": "locked", "message": "Too early!"})
 
 
+# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run(debug=True)

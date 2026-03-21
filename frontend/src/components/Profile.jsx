@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import Navbar from './Navbar';
-
+import { useEffect } from "react";
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=DM+Sans:wght@300;400;500&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -410,40 +410,60 @@ function formatDob(d) {
   if (!d) return null;
   const parts = d.split('-');
   if (parts.length !== 3) return d;
-  const months = ['January','February','March','April','May','June',
-    'July','August','September','October','November','December'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
   return `${months[parseInt(parts[1]) - 1]} ${parseInt(parts[2])}, ${parts[0]}`;
 }
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
 const Profile = () => {
-  const email = localStorage.getItem('email') || '';
-  const name  = localStorage.getItem('name')  || '';
-  const dob   = localStorage.getItem('dob')   || '';
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem('mv_user');
+    return stored ? JSON.parse(stored) : null;
+  });
+
+  const email = user?.email || '';
+  const name = user?.name || '';
+  const dob = user?.dob || '';
+
+  // Fetch full profile from API on mount
+  useEffect(() => {
+    if (email) {
+      fetch(`http://127.0.0.1:5000/profile/${email}`)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.message) {
+            setUser(data);
+            localStorage.setItem('mv_user', JSON.stringify(data));
+          }
+        })
+        .catch(err => console.error("Error fetching profile:", err));
+    }
+  }, [email]);
 
   const initials = name.trim()
     ? name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2)
     : email[0]?.toUpperCase() || '?';
 
   // Photo state — persisted in localStorage as data-URL
-  const [photo, setPhoto]         = useState(localStorage.getItem('profile_photo') || '');
+  const [photo, setPhoto] = useState(localStorage.getItem('profile_photo') || '');
   const [photoModal, setPhotoModal] = useState(false);
   const [pendingPhoto, setPendingPhoto] = useState('');   // preview inside modal
-  const [dragOver, setDragOver]   = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const photoInputRef = useRef();
 
   // Password modal state
   const [showPwModal, setShowPwModal] = useState(false);
-  const [pw, setPw]     = useState({ current: '', next: '', confirm: '' });
+  const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
   const [pwErr, setPwErr] = useState('');
-  const [busy, setBusy]   = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const [toast, setToast] = useState('');
 
   const strength = getStrength(pw.next);
 
   /* ── photo helpers ── */
-  const openPhotoModal  = () => { setPendingPhoto(''); setDragOver(false); setPhotoModal(true); };
+  const openPhotoModal = () => { setPendingPhoto(''); setDragOver(false); setPhotoModal(true); };
   const closePhotoModal = () => setPhotoModal(false);
 
   const readFile = (file) => {
@@ -475,13 +495,13 @@ const Profile = () => {
   };
 
   /* ── password helpers ── */
-  const openPwModal  = () => { setPw({ current:'', next:'', confirm:'' }); setPwErr(''); setShowPwModal(true); };
+  const openPwModal = () => { setPw({ current: '', next: '', confirm: '' }); setPwErr(''); setShowPwModal(true); };
   const closePwModal = () => setShowPwModal(false);
 
   const handleSave = async () => {
     setPwErr('');
-    if (!pw.current)            return setPwErr('Please enter your current password.');
-    if (pw.next.length < 8)     return setPwErr('New password must be at least 8 characters.');
+    if (!pw.current) return setPwErr('Please enter your current password.');
+    if (pw.next.length < 8) return setPwErr('New password must be at least 8 characters.');
     if (pw.next !== pw.confirm) return setPwErr('New passwords do not match.');
 
     setBusy(true);
@@ -540,8 +560,8 @@ const Profile = () => {
               <div className="avatar-overlay">
                 {/* Camera SVG inline */}
                 <svg className="overlay-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                  <circle cx="12" cy="13" r="4"/>
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
                 </svg>
                 <span className="overlay-label">{photo ? 'Change' : 'Upload'}</span>
               </div>
@@ -551,7 +571,7 @@ const Profile = () => {
 
             <div className="hero-text">
               <div className="hero-name">
-                {name || <span style={{ color:'#c4b8d8', fontStyle:'italic', fontWeight:300, fontSize:22 }}>No name provided</span>}
+                {name || <span style={{ color: '#c4b8d8', fontStyle: 'italic', fontWeight: 300, fontSize: 22 }}>No name provided</span>}
               </div>
               <div className="hero-email">{email}</div>
 
@@ -631,9 +651,9 @@ const Profile = () => {
                     <span className="drop-icon">
                       {/* Upload icon */}
                       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#d8bee5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="16 16 12 12 8 16"/>
-                        <line x1="12" y1="12" x2="12" y2="21"/>
-                        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+                        <polyline points="16 16 12 12 8 16" />
+                        <line x1="12" y1="12" x2="12" y2="21" />
+                        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
                       </svg>
                     </span>
                   )}
@@ -692,7 +712,7 @@ const Profile = () => {
                     value={pw.next} onChange={e => setPw({ ...pw, next: e.target.value })} />
                   {pw.next && (
                     <div className="strength-row">
-                      {[1,2,3,4].map(bar => (
+                      {[1, 2, 3, 4].map(bar => (
                         <div key={bar} className={segClass(bar, strength.level)} />
                       ))}
                       <span className="strength-text">{strength.label}</span>
@@ -727,3 +747,4 @@ const Profile = () => {
 };
 
 export default Profile;
+

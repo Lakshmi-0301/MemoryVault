@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Plus, Baby, Star } from "lucide-react";
 import Navbar from "./Navbar";
 import AddEventModal from "./AddEventModal";
@@ -22,17 +22,23 @@ function Timeline() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [user, setUser] = useState(null);
 
+  const initialized = useRef(false);
+
   useEffect(() => {
     const stored = localStorage.getItem("mv_user");
     if (stored) {
       const parsedUser = JSON.parse(stored);
       setUser(parsedUser);
-      initializeTimeline(parsedUser);
+      
+      if (!initialized.current) {
+        initialized.current = true;
+        initializeTimeline(parsedUser);
+      }
     }
   }, []);
 
-  const initializeTimeline = (parsedUser) => {
-    const existing = getEvents(parsedUser.email);
+  const initializeTimeline = async (parsedUser) => {
+    const existing = await getEvents(parsedUser.email);
 
     // If no DOB event exists yet, auto-insert it
     const hasDobEvent = existing.some((e) => e.is_dob);
@@ -45,16 +51,16 @@ function Timeline() {
         media: { images: [], audio: [], video: [] },
         is_dob: true,
       };
-      const updated = addEvent(parsedUser.email, dobEvent);
+      const updated = await addEvent(parsedUser.email, dobEvent);
       setEvents(updated);
     } else {
       setEvents(existing);
     }
   };
 
-  const handleAddEvent = (newEvent) => {
+  const handleAddEvent = async (newEvent) => {
     if (!user) return;
-    const updated = addEvent(user.email, newEvent);
+    const updated = await addEvent(user.email, newEvent);
     setEvents(updated);
   };
 

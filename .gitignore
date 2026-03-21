@@ -1,0 +1,41 @@
+# ---------------- ENV FILES ----------------
+.env
+.env.*
+backend/.env
+
+# ---------------- PYTHON ----------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+# ---------------- VIRTUAL ENV ----------------
+venv/
+.env/
+.venv/
+env/
+
+# ---------------- FLASK ----------------
+instance/
+.webassets-cache
+
+# ---------------- LOGS ----------------
+*.log
+
+# ---------------- OS FILES ----------------
+.DS_Store
+Thumbs.db
+
+# ---------------- IDE ----------------
+.vscode/
+.idea/
+
+# ---------------- NODE (if frontend exists) ----------------
+node_modules/
+dist/
+build/
+
+# ---------------- MISC ----------------
+*.swp
+*.bak

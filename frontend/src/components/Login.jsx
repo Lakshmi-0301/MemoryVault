@@ -108,9 +108,9 @@ function Login() {
     });
     const data = await res.json();
     if (res.status === 200) {
-      localStorage.setItem("email", form.email);
-      localStorage.setItem("name", data.user?.name || "");
-      localStorage.setItem("dob", data.user?.dob || "");
+      if (data.user) {
+        localStorage.setItem("mv_user", JSON.stringify(data.user));
+      }
       navigate("/home");
     } else {
       setError(data.message || "Login failed. Please try again.");
