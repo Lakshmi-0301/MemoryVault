@@ -1,0 +1,6 @@
+Flask==3.0.3
+Flask-CORS==4.0.0
+pymongo[srv]==4.6.3
+python-dotenv==1.0.1
+boto3==1.34.82
+groq>=0.9.0

@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: memoryvault-backend
+    ports:
+      - "5001:5000"
+    environment:
+      - S3_ENDPOINT=http://localstack:4566
+      - S3_EXTERNAL_ENDPOINT=http://localhost:4566
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - localstack
+    restart: always
+    networks:
+      - mv-network
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: memoryvault-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - mv-network
+
+  localstack:
+    image: localstack/localstack
+    container_name: memoryvault-localstack
+    ports:
+      - "4566:4566"            # LocalStack API
+    environment:
+      - SERVICES=s3
+      - DEBUG=1
+    volumes:
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - mv-network
+
+networks:
+  mv-network:
+    driver: bridge

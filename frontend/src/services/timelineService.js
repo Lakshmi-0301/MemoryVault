@@ -1,7 +1,7 @@
 // timelineService.js
 // Backend API adapter for timeline events (MongoDB via Flask backend).
 
-const API_URL = "http://127.0.0.1:5000/api/events";
+const API_URL = "http://127.0.0.1:5001/api/events";
 
 /**
  * Fetch all events for a user, sorted chronologically.

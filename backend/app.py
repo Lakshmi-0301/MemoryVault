@@ -1,5 +1,7 @@
 import os
 import uuid
+import base64
+import boto3
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -24,6 +26,69 @@ db = client["memoryvault"]
 users_col = db["users"]
 events_col = db["events"]
 capsules_col = db["capsules"]
+
+# ---------------- S3 CLIENT ----------------
+s3_client = boto3.client(
+    "s3",
+    endpoint_url=os.getenv("S3_ENDPOINT", "http://localhost:4566"),
+    aws_access_key_id="test",
+    aws_secret_access_key="test",
+    region_name="us-east-1"
+)
+BUCKET_NAME = "memoryvault-media"
+
+try:
+    s3_client.head_bucket(Bucket=BUCKET_NAME)
+except Exception:
+    try:
+        s3_client.create_bucket(Bucket=BUCKET_NAME)
+        s3_client.put_bucket_cors(
+            Bucket=BUCKET_NAME,
+            CORSConfiguration={
+                'CORSRules': [{
+                    'AllowedHeaders': ['*'],
+                    'AllowedMethods': ['GET', 'PUT', 'POST', 'DELETE'],
+                    'AllowedOrigins': ['*'],
+                    'ExposeHeaders': []
+                }]
+            }
+        )
+    except Exception as e:
+        print("Could not create bucket:", e)
+
+def process_media_item(item):
+    if not isinstance(item, dict) or not item.get("data"):
+        return item
+    if not item["data"].startswith("data:"):
+        return item # Already URL or raw text
+
+    try:
+        header, base64_str = item["data"].split(",", 1)
+        mime_type = item.get("type")
+        if not mime_type:
+            mime_type = header.split(";")[0].split(":")[1]
+        file_bytes = base64.b64decode(base64_str)
+        
+        filename = f"{uuid.uuid4()}_{item.get('name', 'file')}"
+        
+        s3_client.put_object(
+            Bucket=BUCKET_NAME,
+            Key=filename,
+            Body=file_bytes,
+            ContentType=mime_type,
+            ACL='public-read'
+        )
+        
+        url = f"{os.getenv('S3_EXTERNAL_ENDPOINT', 'http://localhost:4566')}/{BUCKET_NAME}/{filename}"
+        
+        return {
+            "name": item.get("name"),
+            "data": url,
+            "type": mime_type
+        }
+    except Exception as e:
+        print("S3 Upload error:", e)
+        return item
 
 # ---------------- AUTH ----------------
 @app.route("/signup", methods=["POST"])
@@ -131,9 +196,9 @@ def add_event(user_email):
         "date": data.get("date"),
         "notes": data.get("notes", ""),
         "media": {
-            "images": data.get("media", {}).get("images", []),
-            "audio": data.get("media", {}).get("audio", []),
-            "video": data.get("media", {}).get("video", []),
+            "images": [process_media_item(img) for img in data.get("media", {}).get("images", [])],
+            "audio": [process_media_item(a) for a in data.get("media", {}).get("audio", [])],
+            "video": [process_media_item(v) for v in data.get("media", {}).get("video", [])],
         },
         "is_dob": data.get("is_dob", False),
         "user_email": user_email,
