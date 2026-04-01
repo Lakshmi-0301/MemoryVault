@@ -320,7 +320,7 @@ const Summary = () => {
     setSections(null);
 
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/summary/${encodeURIComponent(email)}`);
+      const res = await fetch(`http://127.0.0.1:5001/api/summary/${encodeURIComponent(email)}`);
       const data = await res.json();
 
       if (!res.ok) {
