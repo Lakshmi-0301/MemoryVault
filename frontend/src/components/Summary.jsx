@@ -311,8 +311,10 @@ const Summary = () => {
 
   const fetchSummary = async () => {
     // Read fresh every time — never rely on a stale component-level value
-    const email = localStorage.getItem('email') || '';
-    console.log('[Summary] email from localStorage:', JSON.stringify(email));
+    const storedUser = localStorage.getItem('mv_user');
+    const user = storedUser ? JSON.parse(storedUser) : {};
+    const email = user.email || '';
+    console.log('[Summary] email from mv_user:', JSON.stringify(email));
     if (!email) { setStatus('error'); return; }
 
     setStatus('loading');
@@ -320,7 +322,7 @@ const Summary = () => {
     setSections(null);
 
     try {
-      const res = await fetch(`http://127.0.0.1:5001/api/summary/${encodeURIComponent(email)}`);
+      const res = await fetch(`http://localhost:5001/api/summary/${encodeURIComponent(email)}`);
       const data = await res.json();
 
       if (!res.ok) {

@@ -127,7 +127,7 @@ const Navbar = () => {
               </Link>
             ))}
           </div>
-          <button className="logout-button" onClick={() => { localStorage.removeItem('email'); localStorage.removeItem('name'); localStorage.removeItem('dob'); navigate('/login'); }}>
+          <button className="logout-button" onClick={() => { localStorage.removeItem('mv_user'); navigate('/login'); }}>
             <LogOut size={16} /><span>Logout</span>
           </button>
         </div>

@@ -101,19 +101,15 @@ function Login() {
 
   const handleSubmit = async () => {
     setError("");
-    const res = await fetch("http://127.0.0.1:5001/login", {
+    const res = await fetch("http://localhost:5001/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
     const data = await res.json();
     if (res.status === 200) {
-      const emailToSave = form.email.trim();
-      localStorage.removeItem('email'); // clear first to avoid any stale value
-      localStorage.setItem("email", emailToSave);
-      localStorage.setItem("name", data.user?.name || "");
-      localStorage.setItem("dob", data.user?.dob || "");
-      console.log('[Login] saved email:', localStorage.getItem('email'));
+      localStorage.setItem("mv_user", JSON.stringify(data.user || {}));
+      console.log('[Login] saved user info');
       navigate("/home");
     } else {
       setError(data.message || "Login failed. Please try again.");
