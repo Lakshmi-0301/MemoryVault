@@ -111,7 +111,7 @@ function Signup() {
     setError("");
     const formData = new FormData();
     Object.entries(form).forEach(([k, v]) => { if (v) formData.append(k, v); });
-    const res = await fetch("http://127.0.0.1:5001/signup", { method:"POST", body:formData });
+    const res = await fetch("http://localhost:5001/signup", { method:"POST", body:formData });
     const data = await res.json();
     if (res.status === 200) navigate("/login");
     else setError(data.message || "Signup failed.");

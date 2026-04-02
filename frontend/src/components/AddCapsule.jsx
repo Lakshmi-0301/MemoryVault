@@ -284,7 +284,7 @@ function AddCapsule() {
     audios.forEach(f => formData.append("audios", f));
     videos.forEach(f => formData.append("videos", f));
 
-    await fetch("http://127.0.0.1:5001/add_capsule", { method: "POST", body: formData });
+    await fetch("http://localhost:5001/add_capsule", { method: "POST", body: formData });
     setSuccess(true);
     setTimeout(() => navigate("/home/capsule"), 1600);
   };

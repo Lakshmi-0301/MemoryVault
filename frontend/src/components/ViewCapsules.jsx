@@ -316,7 +316,7 @@ function ViewCapsules() {
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("mv_user") || "{}");
     if (user.email) {
-      fetch(`http://127.0.0.1:5001/capsules/${user.email}`)
+      fetch(`http://localhost:5001/capsules/${user.email}`)
         .then(res => res.json())
         .then(data => { setCapsules(data); setLoading(false); })
         .catch(() => setLoading(false));
@@ -329,7 +329,7 @@ function ViewCapsules() {
     setSelected(capsule);
     const user = JSON.parse(localStorage.getItem("mv_user") || "{}");
     if (today >= capsule.open_date) {
-      const res = await fetch("http://127.0.0.1:5001/open_capsule", {
+      const res = await fetch("http://localhost:5001/open_capsule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: capsule.name, email: user.email })

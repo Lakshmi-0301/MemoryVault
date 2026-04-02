@@ -429,7 +429,7 @@ const Profile = () => {
   // Fetch full profile from API on mount
   useEffect(() => {
     if (email) {
-      fetch(`http://127.0.0.1:5001/profile/${email}`)
+      fetch(`http://localhost:5001/profile/${email}`)
         .then(res => res.json())
         .then(data => {
           if (!data.message) {
@@ -506,7 +506,7 @@ const Profile = () => {
 
     setBusy(true);
     try {
-      const res = await fetch('http://127.0.0.1:5001/change_password', {
+      const res = await fetch('http://localhost:5001/change_password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, current_password: pw.current, new_password: pw.next }),
